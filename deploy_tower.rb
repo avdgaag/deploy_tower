@@ -7,19 +7,16 @@ class DeployTower < Sinatra::Base
   set :root, File.dirname(__FILE__)
 
   helpers do
-    def protected!
-      unless authorized?
+    def protected!(repo_name)
+      unless authorized?(repo_name)
         response['WWW-Authenticate'] = %(Basic realm="Restricted Area")
         throw(:halt, [401, "Not authorized\n"])
       end
     end
 
-    def authorized?
+    def authorized?(repo_name)
       @auth ||=  Rack::Auth::Basic::Request.new(request.env)
-      if @auth.provided? && @auth.basic? && @auth.credentials
-        repo_name, api_key = @auth.credentials
-        REPOS.has_key?(repo_name.downcase) && REPOS[repo_name.downcase]["api_key"] == api_key
-      end
+      @auth.provided? && @auth.basic? && @auth.credentials && REPOS.has_key?(repo_name) && @auth.credentials == [repo_name, REPOS[repo_name.downcase]["api_key"]]
     end
   end
 
@@ -31,12 +28,14 @@ class DeployTower < Sinatra::Base
   # Optional parameters:
   #  - branch - branch to deploy
   get '/deploy/:repo_name' do
-    protected!
+    protected!(params[:repo_name].downcase)
 
     repo_name = params[:repo_name].downcase
     repo = REPOS[repo_name]
     root = settings.root
-    branch = params[:branch] || REPOS["local_branch"] || 'master'
+    branch = params[:branch] || repo["local_branch"] || 'master'
+
+    puts ">> Deploying #{branch} branch"
 
     %x(mkdir -p #{root}/repos)
 
@@ -44,6 +43,7 @@ class DeployTower < Sinatra::Base
 
     # Try to load repo, check out if necessary
     cmds << "cd #{root}/repos"
+    cmds << "if [ -d #{repo_name} ] ; then rm -rf #{repo_name} ; fi"
     cmds << "git clone #{repo["git"]} #{repo_name}"
     cmds << "cd #{root}/repos/#{repo_name}"
 
@@ -54,7 +54,7 @@ class DeployTower < Sinatra::Base
     cmds << "git remote add heroku #{repo["heroku"]}"
 
     # Deploy that puppy
-    cmds << "git push heroku #{branch}:master"
+    cmds << "git push -f heroku #{branch}:master"
 
     # Cleanup
     cmds << "cd #{root}"
