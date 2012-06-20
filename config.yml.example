@@ -1,0 +1,7 @@
+# Deploys the deploy branch by default via /deploy/app_name
+app_name:
+  git: git@github.com:yourrepo.git
+  heroku: git@heroku.com:app_name.git
+  local_branch: deploy
+  api_key: "4c6b837fb2005f7a14f9a82cafa3e0eb"
+
