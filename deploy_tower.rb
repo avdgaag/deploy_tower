@@ -55,6 +55,10 @@ class DeployTower < Sinatra::Base
 
     # Deploy that puppy
     cmds << "git push -f heroku #{branch}:master"
+    
+    # Migrate the hell out of that mofo
+    cmds << "heroku run rake db:migrate"
+    cmds << "heroku restart"
 
     # Cleanup
     cmds << "cd #{root}"
